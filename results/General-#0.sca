@@ -1,0 +1,432 @@
+version 3
+run General-0-20260404-01:27:05-165597
+attr configname General
+attr datetime 20260404-01:27:05
+attr datetimef 20260404-012705
+attr experiment General
+attr inifile omnetpp.ini
+attr iterationvars ""
+attr iterationvarsd ""
+attr iterationvarsf ""
+attr measurement ""
+attr network MISTNetwork
+attr processid 165597
+attr repetition 0
+attr replication #0
+attr resultdir results
+attr runnumber 0
+attr seedset 0
+config network MISTNetwork
+config sim-time-limit 30s
+config record-eventlog false
+config **.scalar-recording true
+config **.vector-recording false
+config seed-set 0
+
+scalar MISTNetwork.mist[0] "MIST IDS jitter alert at" 1.055
+scalar MISTNetwork.mist[1] "MIST IDS jitter alert at" 1.055
+scalar MISTNetwork.fog[0] "Fog IDS jitter alert at" 1.155
+scalar MISTNetwork.cloud "Cloud IDS jitter alert at" 2.355
+scalar MISTNetwork.fog[1] "Fog IDS jitter alert at" 3.155
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 5.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 5.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 5.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 5.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 5.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 5.005
+scalar MISTNetwork.cloud "Cloud IDS throughput alert at" 5.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 6.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 6.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 6.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 6.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 6.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 6.005
+scalar MISTNetwork.mist[0] "MIST IDS rate alert at" 6.055
+scalar MISTNetwork.fog[0] "Fog IDS rate alert at" 6.155
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 6.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 7.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 7.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 7.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 7.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 7.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 7.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 8.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 8.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 8.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 8.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 8.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 8.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 9.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 9.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 9.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 9.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 9.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 9.005
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 9.355
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 9.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 10.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 10.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 10.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 10.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 10.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 10.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 11.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 11.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 11.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 11.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 11.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 11.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 12.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 12.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 12.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 12.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 12.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 12.005
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 12.355
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 12.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 13.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 13.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 13.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 13.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 13.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 13.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 14.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 14.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 14.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 14.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 14.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 14.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 15.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 15.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 15.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 15.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 15.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 15.005
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 15.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 16.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 16.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 16.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 16.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 16.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 16.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 17.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 17.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 17.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 17.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 17.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 17.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 18.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 18.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 18.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 18.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 18.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 18.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 19.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 19.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 19.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 19.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 19.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 19.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 20.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 20.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 20.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 20.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 20.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 20.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 21.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 21.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 21.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 21.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 21.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 21.005
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 21.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 22.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 22.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 22.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 22.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 22.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 22.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 23.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 23.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 23.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 23.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 23.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 23.005
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 23.355
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 23.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 24.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 24.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 24.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 24.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 24.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 24.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 25.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 25.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 25.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 25.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 25.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 25.005
+scalar MISTNetwork.mist[0] "MIST IDS rate alert at" 25.055
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 26.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 26.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 26.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 26.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 26.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 26.005
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 26.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 27.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 27.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 27.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 27.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 27.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 27.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 28.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 28.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 28.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 28.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 28.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 28.005
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 28.355
+scalar MISTNetwork.cloud "Cloud IDS rate alert at" 28.355
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 29.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 29.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 29.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 29.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 29.005
+scalar MISTNetwork.edge[0] "Edge IDS alert at" 29.005
+scalar MISTNetwork.mist[0] "MIST IDS rate alert at" 29.055
+scalar MISTNetwork.mist[0] "MIST IDS rate alert at" 29.055
+par MISTNetwork.iot[0].out.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.iot[0].out.channel disabled false
+attr mutable ""
+par MISTNetwork.iot[0].out.channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.iot[1].out.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.iot[1].out.channel disabled false
+attr mutable ""
+par MISTNetwork.iot[1].out.channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.iot[2].out.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.iot[2].out.channel disabled false
+attr mutable ""
+par MISTNetwork.iot[2].out.channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.iot[3].out.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.iot[3].out.channel disabled false
+attr mutable ""
+par MISTNetwork.iot[3].out.channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.iot[4].out.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.iot[4].out.channel disabled false
+attr mutable ""
+par MISTNetwork.iot[4].out.channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.edge[0].toIoT[0].channel typename "\"ned.DelayChannel\""
+par MISTNetwork.edge[0].toIoT[0].channel disabled false
+attr mutable ""
+par MISTNetwork.edge[0].toIoT[0].channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.edge[0].toIoT[1].channel typename "\"ned.DelayChannel\""
+par MISTNetwork.edge[0].toIoT[1].channel disabled false
+attr mutable ""
+par MISTNetwork.edge[0].toIoT[1].channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.edge[1].toIoT[0].channel typename "\"ned.DelayChannel\""
+par MISTNetwork.edge[1].toIoT[0].channel disabled false
+attr mutable ""
+par MISTNetwork.edge[1].toIoT[0].channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.edge[2].toIoT[0].channel typename "\"ned.DelayChannel\""
+par MISTNetwork.edge[2].toIoT[0].channel disabled false
+attr mutable ""
+par MISTNetwork.edge[2].toIoT[0].channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.edge[2].toIoT[1].channel typename "\"ned.DelayChannel\""
+par MISTNetwork.edge[2].toIoT[1].channel disabled false
+attr mutable ""
+par MISTNetwork.edge[2].toIoT[1].channel delay 0.005s
+attr mutable ""
+attr unit s
+par MISTNetwork.edge[0].toMIST.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.edge[0].toMIST.channel disabled false
+attr mutable ""
+par MISTNetwork.edge[0].toMIST.channel delay 0.05s
+attr mutable ""
+attr unit s
+par MISTNetwork.edge[1].toMIST.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.edge[1].toMIST.channel disabled false
+attr mutable ""
+par MISTNetwork.edge[1].toMIST.channel delay 0.05s
+attr mutable ""
+attr unit s
+par MISTNetwork.edge[2].toMIST.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.edge[2].toMIST.channel disabled false
+attr mutable ""
+par MISTNetwork.edge[2].toMIST.channel delay 0.05s
+attr mutable ""
+attr unit s
+par MISTNetwork.mist[0].toEdge[0].channel typename "\"ned.DelayChannel\""
+par MISTNetwork.mist[0].toEdge[0].channel disabled false
+attr mutable ""
+par MISTNetwork.mist[0].toEdge[0].channel delay 0.05s
+attr mutable ""
+attr unit s
+par MISTNetwork.mist[0].toEdge[1].channel typename "\"ned.DelayChannel\""
+par MISTNetwork.mist[0].toEdge[1].channel disabled false
+attr mutable ""
+par MISTNetwork.mist[0].toEdge[1].channel delay 0.05s
+attr mutable ""
+attr unit s
+par MISTNetwork.mist[1].toEdge[0].channel typename "\"ned.DelayChannel\""
+par MISTNetwork.mist[1].toEdge[0].channel disabled false
+attr mutable ""
+par MISTNetwork.mist[1].toEdge[0].channel delay 0.05s
+attr mutable ""
+attr unit s
+par MISTNetwork.mist[0].toFog.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.mist[0].toFog.channel disabled false
+attr mutable ""
+par MISTNetwork.mist[0].toFog.channel delay 0.1s
+attr mutable ""
+attr unit s
+par MISTNetwork.mist[1].toFog.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.mist[1].toFog.channel disabled false
+attr mutable ""
+par MISTNetwork.mist[1].toFog.channel delay 0.1s
+attr mutable ""
+attr unit s
+par MISTNetwork.fog[0].toCloud.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.fog[0].toCloud.channel disabled false
+attr mutable ""
+par MISTNetwork.fog[0].toCloud.channel delay 0.2s
+attr mutable ""
+attr unit s
+par MISTNetwork.fog[1].toCloud.channel typename "\"ned.DelayChannel\""
+par MISTNetwork.fog[1].toCloud.channel disabled false
+attr mutable ""
+par MISTNetwork.fog[1].toCloud.channel delay 0.2s
+attr mutable ""
+attr unit s
+par MISTNetwork.iot[0] typename "\"IoTNode\""
+par MISTNetwork.iot[1] typename "\"IoTNode\""
+par MISTNetwork.iot[2] typename "\"IoTNode\""
+par MISTNetwork.iot[3] typename "\"IoTNode\""
+par MISTNetwork.iot[4] typename "\"IoTNode\""
+par MISTNetwork.edge[0] typename "\"EdgeNode\""
+scalar MISTNetwork.edge[0] "Edge total packets" 283
+scalar MISTNetwork.edge[0] "Edge dropped packets" 150
+scalar MISTNetwork.edge[0] "Edge forwarded packets" 69
+scalar MISTNetwork.edge[0] "Edge local packets" 64
+scalar MISTNetwork.edge[0] "Edge IDS alerts" 150
+scalar MISTNetwork.edge[0] "Edge IDS dropped" 150
+scalar MISTNetwork.edge[0] "Edge avg latency" 0.0023498233215548
+scalar MISTNetwork.edge[0] "Edge avg jitter" 1.7667844522968e-05
+scalar MISTNetwork.edge[0] "Edge throughput" 9.4333333333333
+scalar MISTNetwork.edge[0] "Edge drop rate" 0.53003533568905
+scalar MISTNetwork.edge[0] "Edge detection rate" 0.53003533568905
+par MISTNetwork.edge[1] typename "\"EdgeNode\""
+scalar MISTNetwork.edge[1] "Edge total packets" 29
+scalar MISTNetwork.edge[1] "Edge dropped packets" 0
+scalar MISTNetwork.edge[1] "Edge forwarded packets" 17
+scalar MISTNetwork.edge[1] "Edge local packets" 12
+scalar MISTNetwork.edge[1] "Edge IDS alerts" 0
+scalar MISTNetwork.edge[1] "Edge IDS dropped" 0
+scalar MISTNetwork.edge[1] "Edge avg latency" 0.005
+scalar MISTNetwork.edge[1] "Edge avg jitter" 0.00017241379310345
+scalar MISTNetwork.edge[1] "Edge throughput" 0.96666666666667
+scalar MISTNetwork.edge[1] "Edge drop rate" 0
+scalar MISTNetwork.edge[1] "Edge detection rate" 0
+par MISTNetwork.edge[2] typename "\"EdgeNode\""
+scalar MISTNetwork.edge[2] "Edge total packets" 58
+scalar MISTNetwork.edge[2] "Edge dropped packets" 0
+scalar MISTNetwork.edge[2] "Edge forwarded packets" 29
+scalar MISTNetwork.edge[2] "Edge local packets" 29
+scalar MISTNetwork.edge[2] "Edge IDS alerts" 0
+scalar MISTNetwork.edge[2] "Edge IDS dropped" 0
+scalar MISTNetwork.edge[2] "Edge avg latency" 0.005
+scalar MISTNetwork.edge[2] "Edge avg jitter" 8.6206896551724e-05
+scalar MISTNetwork.edge[2] "Edge throughput" 1.9333333333333
+scalar MISTNetwork.edge[2] "Edge drop rate" 0
+scalar MISTNetwork.edge[2] "Edge detection rate" 0
+par MISTNetwork.mist[0] typename "\"MISTNode\""
+scalar MISTNetwork.mist[0] "MIST total packets" 86
+scalar MISTNetwork.mist[0] "MIST dropped packets" 5
+scalar MISTNetwork.mist[0] "MIST forwarded packets" 42
+scalar MISTNetwork.mist[0] "MIST local packets" 39
+scalar MISTNetwork.mist[0] "MIST IDS alerts" 5
+scalar MISTNetwork.mist[0] "MIST IDS dropped" 5
+scalar MISTNetwork.mist[0] "MIST IDS rate alerts" 4
+scalar MISTNetwork.mist[0] "MIST IDS jitter alerts" 1
+scalar MISTNetwork.mist[0] "MIST avg latency" 0.055
+scalar MISTNetwork.mist[0] "MIST avg jitter" 0.00063953488372093
+scalar MISTNetwork.mist[0] "MIST throughput" 2.8666666666667
+scalar MISTNetwork.mist[0] "MIST drop rate" 0.058139534883721
+scalar MISTNetwork.mist[0] "MIST detection rate" 0.058139534883721
+par MISTNetwork.mist[1] typename "\"MISTNode\""
+scalar MISTNetwork.mist[1] "MIST total packets" 29
+scalar MISTNetwork.mist[1] "MIST dropped packets" 1
+scalar MISTNetwork.mist[1] "MIST forwarded packets" 15
+scalar MISTNetwork.mist[1] "MIST local packets" 13
+scalar MISTNetwork.mist[1] "MIST IDS alerts" 1
+scalar MISTNetwork.mist[1] "MIST IDS dropped" 1
+scalar MISTNetwork.mist[1] "MIST IDS rate alerts" 0
+scalar MISTNetwork.mist[1] "MIST IDS jitter alerts" 1
+scalar MISTNetwork.mist[1] "MIST avg latency" 0.055
+scalar MISTNetwork.mist[1] "MIST avg jitter" 0.0018965517241379
+scalar MISTNetwork.mist[1] "MIST throughput" 0.96666666666667
+scalar MISTNetwork.mist[1] "MIST drop rate" 0.03448275862069
+scalar MISTNetwork.mist[1] "MIST detection rate" 0.03448275862069
+par MISTNetwork.fog[0] typename "\"FogNode\""
+scalar MISTNetwork.fog[0] "Fog total packets" 42
+scalar MISTNetwork.fog[0] "Fog dropped packets" 2
+scalar MISTNetwork.fog[0] "Fog forwarded packets" 40
+scalar MISTNetwork.fog[0] "Fog IDS alerts" 2
+scalar MISTNetwork.fog[0] "Fog IDS dropped" 2
+scalar MISTNetwork.fog[0] "Fog IDS rate alerts" 1
+scalar MISTNetwork.fog[0] "Fog IDS jitter alerts" 1
+scalar MISTNetwork.fog[0] "Fog IDS latency alerts" 0
+scalar MISTNetwork.fog[0] "Fog avg latency" 0.155
+scalar MISTNetwork.fog[0] "Fog avg jitter" 0.0036904761904762
+scalar MISTNetwork.fog[0] "Fog throughput" 1.4
+scalar MISTNetwork.fog[0] "Fog drop rate" 0.047619047619048
+scalar MISTNetwork.fog[0] "Fog detection rate" 0.047619047619048
+par MISTNetwork.fog[1] typename "\"FogNode\""
+scalar MISTNetwork.fog[1] "Fog total packets" 15
+scalar MISTNetwork.fog[1] "Fog dropped packets" 1
+scalar MISTNetwork.fog[1] "Fog forwarded packets" 14
+scalar MISTNetwork.fog[1] "Fog IDS alerts" 1
+scalar MISTNetwork.fog[1] "Fog IDS dropped" 1
+scalar MISTNetwork.fog[1] "Fog IDS rate alerts" 0
+scalar MISTNetwork.fog[1] "Fog IDS jitter alerts" 1
+scalar MISTNetwork.fog[1] "Fog IDS latency alerts" 0
+scalar MISTNetwork.fog[1] "Fog avg latency" 0.155
+scalar MISTNetwork.fog[1] "Fog avg jitter" 0.010333333333333
+scalar MISTNetwork.fog[1] "Fog throughput" 0.5
+scalar MISTNetwork.fog[1] "Fog drop rate" 0.066666666666667
+scalar MISTNetwork.fog[1] "Fog detection rate" 0.066666666666667
+par MISTNetwork.cloud typename "\"CloudNode\""
+scalar MISTNetwork.cloud "Cloud total packets" 54
+scalar MISTNetwork.cloud "Cloud accepted packets" 40
+scalar MISTNetwork.cloud "Cloud dropped packets" 14
+scalar MISTNetwork.cloud "Cloud IDS alerts" 14
+scalar MISTNetwork.cloud "Cloud IDS dropped" 14
+scalar MISTNetwork.cloud "Cloud IDS rate alerts" 12
+scalar MISTNetwork.cloud "Cloud IDS jitter alerts" 1
+scalar MISTNetwork.cloud "Cloud IDS latency alerts" 0
+scalar MISTNetwork.cloud "Cloud IDS throughput alerts" 1
+scalar MISTNetwork.cloud "Cloud avg latency" 0.355
+scalar MISTNetwork.cloud "Cloud avg jitter" 0.0065740740740741
+scalar MISTNetwork.cloud "Cloud throughput" 1.8
+scalar MISTNetwork.cloud "Cloud drop rate" 0.25925925925926
+scalar MISTNetwork.cloud "Cloud detection rate" 0.25925925925926
+par MISTNetwork typename "\"MISTNetwork\""
+
