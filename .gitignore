@@ -1,0 +1,6 @@
+results/
+*.sca
+*.vec
+*.vci
+*.out
+
