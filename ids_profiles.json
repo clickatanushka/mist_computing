@@ -1,0 +1,40 @@
+{
+  "DDOS": {
+    "edge": {
+      "rate_pps": 90,
+      "jitter_s": 9.7,
+      "latency_s": 3.07165,
+      "payload_bytes": 830.92855,
+      "entropy": 2048.76875,
+      "primary_rule": "rate",
+      "secondary_rule": "jitter"
+    },
+    "mist": {
+      "rate_pps": 126,
+      "jitter_s": 13.58,
+      "latency_s": 4.30031,
+      "payload_bytes": 1163.29997,
+      "entropy": 2868.27625,
+      "primary_rule": "rate",
+      "secondary_rule": "jitter"
+    },
+    "fog": {
+      "rate_pps": 153,
+      "jitter_s": 16.49,
+      "latency_s": 5.221805,
+      "payload_bytes": 1412.578535,
+      "entropy": 3482.906875,
+      "primary_rule": "rate",
+      "secondary_rule": "jitter"
+    },
+    "cloud": {
+      "rate_pps": 181,
+      "jitter_s": 19.4,
+      "latency_s": 6.1433,
+      "payload_bytes": 1661.8571,
+      "entropy": 4097.5375,
+      "primary_rule": "rate",
+      "secondary_rule": "jitter"
+    }
+  }
+}
