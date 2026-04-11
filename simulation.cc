@@ -556,7 +556,7 @@ class IoTNode : public cSimpleModule {
 //        pkt->setTimestamp(simTime());// ADD THESE 👇
 //        pkt->addPar("srcId") = getIndex();
 //        pkt->addPar("isAttack") = false;
-        send(pkt, "out");
+//        send(pkt, "out");
         EV << "IoT[" << getIndex() << "] sent packet #" << packetCount
            << " at t=" << simTime() << "\n";
         scheduleAt(simTime() + 1, msg);
