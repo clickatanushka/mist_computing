@@ -1,91 +1,99 @@
-simple IoTNode
-{
+simple IoTNode {
     gates:
         output out;
-        input  fromEdge;
+        input  in;
 }
 
-simple EdgeNode
-{
+simple EdgeNode {
     gates:
         input  fromIoT[];
-        input  fromMIST[];
         output toIoT[];
         output toMIST;
+        input  fromMIST @loose;
+        input  controlIn @loose;
+        input  dataIn    @loose;
 }
 
-simple MISTNode
-{
+simple MISTNode {
     gates:
         input  fromEdge[];
         output toEdge[];
         output toFog;
+        input  controlIn @loose;
 }
 
-simple FogNode
-{
+simple FogNode {
     gates:
         input  fromMIST[];
         output toCloud;
+        input  controlIn @loose;
 }
 
-simple CloudNode
-{
+simple CloudNode {
     gates:
-        input fromFog[];
+        input  fromFog;
+        input  controlIn @loose;
 }
 
-network MISTNetwork
-{
-    @display("bgb=800,550");
+simple CentralController {
+    gates:
+        input  dataIn @loose;
+}
 
+channel IoTToEdge extends ned.DatarateChannel {
+    delay = 5ms;
+    datarate = 1Mbps;
+}
+
+channel EdgeToMIST extends ned.DatarateChannel {
+    delay = 50ms;
+    datarate = 10Mbps;
+}
+
+channel MISTToFog extends ned.DatarateChannel {
+    delay = 100ms;
+    datarate = 100Mbps;
+}
+
+channel FogToCloud extends ned.DatarateChannel {
+    delay = 200ms;
+    datarate = 1Gbps;
+}
+
+network IDSNetwork {
     submodules:
-        iot[5]: IoTNode {
-            @display("p=80,480,row,120");
-        }
-        edge[3]: EdgeNode {
-            @display("p=120,360,row,150");
-        }
-        mist[2]: MISTNode {
-            @display("p=200,240,row,200");
-        }
-        fog[2]: FogNode {
-            @display("p=220,120,row,200");
-        }
-        cloud: CloudNode {
-            @display("p=400,20");
-        }
+        iot[5]     : IoTNode;
+        edge[3]    : EdgeNode;
+        mist[2]    : MISTNode;
+        fog        : FogNode;
+        cloud      : CloudNode;
+        controller : CentralController;
 
-    connections:
-        // IoT -> Edge (5ms one-way)
-        iot[0].out --> { delay = 5ms; } --> edge[0].fromIoT++;
-        iot[1].out --> { delay = 5ms; } --> edge[0].fromIoT++;
-        iot[2].out --> { delay = 5ms; } --> edge[1].fromIoT++;
-        iot[3].out --> { delay = 5ms; } --> edge[2].fromIoT++;
-        iot[4].out --> { delay = 5ms; } --> edge[2].fromIoT++;
+    connections allowunconnected:
+        iot[0].out --> IoTToEdge --> edge[0].fromIoT++;
+        edge[0].toIoT++ --> IoTToEdge --> iot[0].in;
 
-        // Edge -> IoT replies (5ms)
-        edge[0].toIoT++ --> { delay = 5ms; } --> iot[0].fromEdge;
-        edge[0].toIoT++ --> { delay = 5ms; } --> iot[1].fromEdge;
-        edge[1].toIoT++ --> { delay = 5ms; } --> iot[2].fromEdge;
-        edge[2].toIoT++ --> { delay = 5ms; } --> iot[3].fromEdge;
-        edge[2].toIoT++ --> { delay = 5ms; } --> iot[4].fromEdge;
+        iot[1].out --> IoTToEdge --> edge[0].fromIoT++;
+        edge[0].toIoT++ --> IoTToEdge --> iot[1].in;
 
-        // Edge -> MIST (50ms)
-        edge[0].toMIST --> { delay = 50ms; } --> mist[0].fromEdge++;
-        edge[1].toMIST --> { delay = 50ms; } --> mist[0].fromEdge++;
-        edge[2].toMIST --> { delay = 50ms; } --> mist[1].fromEdge++;
+        iot[2].out --> IoTToEdge --> edge[1].fromIoT++;
+        edge[1].toIoT++ --> IoTToEdge --> iot[2].in;
 
-        // MIST -> Edge replies (50ms)
-        mist[0].toEdge++ --> { delay = 50ms; } --> edge[0].fromMIST++;
-        mist[0].toEdge++ --> { delay = 50ms; } --> edge[1].fromMIST++;
-        mist[1].toEdge++ --> { delay = 50ms; } --> edge[2].fromMIST++;
+        iot[3].out --> IoTToEdge --> edge[1].fromIoT++;
+        edge[1].toIoT++ --> IoTToEdge --> iot[3].in;
 
-        // MIST -> Fog (100ms)
-        mist[0].toFog --> { delay = 100ms; } --> fog[0].fromMIST++;
-        mist[1].toFog --> { delay = 100ms; } --> fog[1].fromMIST++;
+        iot[4].out --> IoTToEdge --> edge[2].fromIoT++;
+        edge[2].toIoT++ --> IoTToEdge --> iot[4].in;
 
-        // Fog -> Cloud (200ms)
-        fog[0].toCloud --> { delay = 200ms; } --> cloud.fromFog++;
-        fog[1].toCloud --> { delay = 200ms; } --> cloud.fromFog++;
+        edge[0].toMIST --> EdgeToMIST --> mist[0].fromEdge++;
+        edge[1].toMIST --> EdgeToMIST --> mist[0].fromEdge++;
+        edge[2].toMIST --> EdgeToMIST --> mist[1].fromEdge++;
+
+        mist[0].toEdge++ --> EdgeToMIST --> edge[0].fromMIST;
+        mist[1].toEdge++ --> EdgeToMIST --> edge[2].fromMIST;
+
+        mist[0].toFog --> MISTToFog --> fog.fromMIST++;
+        mist[1].toFog --> MISTToFog --> fog.fromMIST++;
+
+        fog.toCloud --> FogToCloud --> cloud.fromFog;
 }
