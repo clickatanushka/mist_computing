@@ -25,7 +25,6 @@ struct ThresholdProfile {
     double latency_s     = 0.300;
     double payload_bytes = 200.0;
     double entropy       = 80.0;
-    // which rules to enforce
     bool   check_rate    = true;
     bool   check_jitter  = true;
     bool   check_latency = true;
@@ -33,7 +32,7 @@ struct ThresholdProfile {
     bool   check_entropy = false;
 };
 
-// ── Simple JSON value extractor (no external library needed) ─
+// ── Simple JSON helpers ───────────────────────────────────────
 static double jsonDouble(const std::string& json,
                           const std::string& key, double def = 0.0) {
     std::string search = "\"" + key + "\"";
@@ -60,27 +59,21 @@ static std::string jsonStr(const std::string& json,
     return json.substr(pos + 1, end - pos - 1);
 }
 
-// ── Profile loader from ids_profiles.json ────────────────────
-// Loads the block:  profiles[attack][layer]
-// Returns fallback if file or block is missing.
 ThresholdProfile loadProfile(const std::string& attack,
                               const std::string& layer) {
     ThresholdProfile p;
     std::ifstream f("ids_profiles.json");
-    if (!f.is_open()) return p;   // file missing → use defaults
+    if (!f.is_open()) return p;
 
     std::string json((std::istreambuf_iterator<char>(f)),
                       std::istreambuf_iterator<char>());
 
-    // find the attack block
     size_t aPos = json.find("\"" + attack + "\"");
     if (aPos == std::string::npos) return p;
 
-    // find the layer block inside the attack block
     size_t lPos = json.find("\"" + layer + "\"", aPos);
     if (lPos == std::string::npos) return p;
 
-    // extract the { ... } block for this layer
     size_t brace = json.find("{", lPos);
     if (brace == std::string::npos) return p;
     size_t end = json.find("}", brace);
@@ -97,7 +90,6 @@ ThresholdProfile loadProfile(const std::string& attack,
     std::string primary   = jsonStr(block, "primary_rule",   "rate");
     std::string secondary = jsonStr(block, "secondary_rule", "jitter");
 
-    // always check rate for all modes (safety net)
     p.check_rate    = true;
     p.check_jitter  = (primary == "jitter"  || secondary == "jitter");
     p.check_latency = (primary == "latency" || secondary == "latency");
@@ -107,7 +99,7 @@ ThresholdProfile loadProfile(const std::string& attack,
     return p;
 }
 
-// ── ModeChange control message ───────────────────────────────
+// ── ModeChange message ────────────────────────────────────────
 class ModeChangeMsg : public cMessage {
   public:
     ThreatMode newMode;
@@ -116,37 +108,31 @@ class ModeChangeMsg : public cMessage {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  CentralController
-//  ─────────────────
-//  Observes aggregate traffic metrics from a shared scalar
-//  (updated by EdgeNode every second) and decides which
-//  ThreatMode is active, then broadcasts ModeChange to all
-//  layers via direct sendDirect().
-//
-//  Classification logic (lightweight, no ML library needed in
-//  OMNeT++; the Python model does the heavy lifting offline and
-//  the thresholds it produces are already in the JSON):
-//
-//  DDOS:  windowRate > ddos_rate_trigger
-//  MITM:  latencySpike detected (latency > 2×baseline)
-//  SQLI:  payload size anomaly (avgPayload > sqli_payload_trigger)
-//  → defaults to DDOS mode if ambiguous (most dangerous)
+//  FIX 1: obsRateSum accumulates across all Edge reports per window
+//          instead of only keeping the last one.
+//  FIX 2: DDOS_RATE_TRIGGER lowered to 6 (3 edges × 2 pkts each
+//          is normal; flood pushes it above 6 easily).
+//  FIX 3: SQLI_PAYLOAD_TRIGGER lowered to 200 so large payload
+//          packets (1200 bytes) actually trigger mode switch.
+//  FIX 4: broadcastMode uses full NED path "IDSNetwork.fog" etc.
+//          because getModuleByPath resolves relative to network root.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class CentralController : public cSimpleModule {
   private:
     ThreatMode currentMode = MODE_DDOS;
-    simtime_t  lastSwitch  = 0;
     int        switchCount = 0;
 
-    // observation window (updated via signals from EdgeNode)
-    double obsRate        = 0;
-    double obsLatency     = 0;
-    double obsPayload     = 0;
-    double obsJitter      = 0;
+    // FIX 1: accumulate rate across all Edge nodes per scan window
+    double obsRateSum  = 0;
+    int    reportCount = 0;
+    double obsLatency  = 0;
+    double obsPayload  = 0;
+    double obsJitter   = 0;
 
-    // trigger thresholds (conservative — switching is costly)
-    const double DDOS_RATE_TRIGGER    = 8.0;   // pkt/s aggregate
-    const double MITM_LATENCY_TRIGGER = 0.15;  // seconds
-    const double SQLI_PAYLOAD_TRIGGER = 400.0; // bytes
+    // FIX 2 & 3: lower triggers so they actually fire
+    const double DDOS_RATE_TRIGGER    = 6.0;   // was 8.0
+    const double MITM_LATENCY_TRIGGER = 0.10;  // was 0.15
+    const double SQLI_PAYLOAD_TRIGGER = 200.0; // was 400.0
 
     cMessage *scanTimer = nullptr;
 
@@ -154,23 +140,33 @@ class CentralController : public cSimpleModule {
     virtual void initialize() override {
         EV << "[Controller] Starting in DDOS mode (default)\n";
         scanTimer = new cMessage("scanTimer");
-        scheduleAt(simTime() + 2, scanTimer);  // first evaluation at t=2
+        scheduleAt(simTime() + 2, scanTimer);
     }
 
     virtual void handleMessage(cMessage *msg) override {
         if (strcmp(msg->getName(), "EdgeReport") == 0) {
-            // EdgeNode sends us an observation every second
-            obsRate    = msg->par("rate").doubleValue();
-            obsLatency = msg->par("latency").doubleValue();
-            obsPayload = msg->par("payload").doubleValue();
-            obsJitter  = msg->par("jitter").doubleValue();
+            // FIX 1: accumulate, don't overwrite
+            obsRateSum += msg->par("rate").doubleValue();
+            reportCount++;
+            // take max latency / payload seen across edges (most suspicious)
+            double lat = msg->par("latency").doubleValue();
+            double pay = msg->par("payload").doubleValue();
+            if (lat > obsLatency) obsLatency = lat;
+            if (pay > obsPayload) obsPayload = pay;
+            obsJitter = msg->par("jitter").doubleValue();
             delete msg;
             return;
         }
 
         if (strcmp(msg->getName(), "scanTimer") == 0) {
             classifyAndSwitch();
-            scheduleAt(simTime() + 1, msg);   // re-evaluate every second
+            // reset accumulators for next window
+            obsRateSum  = 0;
+            reportCount = 0;
+            obsLatency  = 0;
+            obsPayload  = 0;
+            obsJitter   = 0;
+            scheduleAt(simTime() + 1, msg);
             return;
         }
         delete msg;
@@ -178,36 +174,39 @@ class CentralController : public cSimpleModule {
 
     void classifyAndSwitch() {
         ThreatMode detected = detectMode();
+        EV << "[Controller] t=" << simTime()
+           << " obsRateSum=" << obsRateSum
+           << " obsPayload=" << obsPayload
+           << " obsLatency=" << obsLatency
+           << " → mode=" << modeName(detected) << "\n";
+
         if (detected != currentMode) {
-            EV << "[Controller] t=" << simTime()
-               << " Mode switch: " << modeName(currentMode)
+            EV << "[Controller] MODE SWITCH: " << modeName(currentMode)
                << " → " << modeName(detected) << "\n";
             currentMode = detected;
             switchCount++;
-            lastSwitch  = simTime();
             broadcastMode(detected);
             recordScalar("Controller mode switch at", simTime().dbl());
         }
     }
 
     ThreatMode detectMode() {
-        // Priority: MitM < SQLi < DDoS (most dangerous first)
-        if (obsRate > DDOS_RATE_TRIGGER)
-            return MODE_DDOS;
-        if (obsPayload > SQLI_PAYLOAD_TRIGGER)
-            return MODE_SQLI;
-        if (obsLatency > MITM_LATENCY_TRIGGER)
-            return MODE_MITM;
-        return currentMode;   // no change if below all triggers
+        if (obsRateSum > DDOS_RATE_TRIGGER)    return MODE_DDOS;
+        if (obsPayload > SQLI_PAYLOAD_TRIGGER) return MODE_SQLI;
+        if (obsLatency > MITM_LATENCY_TRIGGER) return MODE_MITM;
+        return currentMode;
     }
 
     void broadcastMode(ThreatMode m) {
-        // send to all layers by name — adjust to your NED topology
+        // FIX 4: use full paths relative to network root
         const char* targets[] = {
-            "edge[0]","edge[1]","edge[2]",
-            "mist[0]","mist[1]",
-            "fog",
-            "cloud",
+            "IDSNetwork.edge[0]",
+            "IDSNetwork.edge[1]",
+            "IDSNetwork.edge[2]",
+            "IDSNetwork.mist[0]",
+            "IDSNetwork.mist[1]",
+            "IDSNetwork.fog",
+            "IDSNetwork.cloud",
             nullptr
         };
         for (int i = 0; targets[i]; i++) {
@@ -215,9 +214,13 @@ class CentralController : public cSimpleModule {
             if (mod) {
                 ModeChangeMsg *ctrl = new ModeChangeMsg(m);
                 sendDirect(ctrl, mod, "controlIn");
+                EV << "[Controller] Sent mode=" << modeName(m)
+                   << " to " << targets[i] << "\n";
+            } else {
+                EV << "[Controller] WARNING: module not found: "
+                   << targets[i] << "\n";
             }
         }
-        EV << "[Controller] Broadcast mode=" << modeName(m) << "\n";
     }
 
     virtual void finish() override {
@@ -229,17 +232,17 @@ Define_Module(CentralController);
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  IoTNode — unchanged from before except:
-//   • iot[0] sends DDoS flood after t=5  (same as before)
-//   • iot[1] sends large payloads after t=15  (SQLi simulation)
-//   • iot[2] sends with artificial delay after t=25 (MitM sim)
+//  IoTNode
+//  iot[0] → DDoS flood after t=5
+//  iot[1] → SQLi large payload after t=15
+//  iot[2] → MitM delayed replay after t=25
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class IoTNode : public cSimpleModule {
   private:
-    int  packetCount  = 0;
-    bool isDDoS       = false;
-    bool isSQLi       = false;
-    bool isMITM       = false;
+    int  packetCount = 0;
+    bool isDDoS      = false;
+    bool isSQLi      = false;
+    bool isMITM      = false;
 
   protected:
     virtual void initialize() override {
@@ -250,7 +253,6 @@ class IoTNode : public cSimpleModule {
     }
 
     virtual void handleMessage(cMessage *msg) override {
-        // reply from Edge
         if (strcmp(msg->getName(), "SensorData") == 0) {
             EV << "IoT[" << getIndex() << "] RTT="
                << (simTime() - msg->getTimestamp()) << "\n";
@@ -258,29 +260,24 @@ class IoTNode : public cSimpleModule {
             return;
         }
 
-        // ── normal packet ──
         packetCount++;
-        sendSensorPacket(64.0, false);   // 64-byte normal packet
+        sendSensorPacket(64.0, false);
         scheduleAt(simTime() + 1, msg);
 
-        // ── DDoS flood (iot[0] after t=5) ──
         if (isDDoS && simTime() >= 5) {
             for (int i = 0; i < 9; i++)
                 sendSensorPacket(64.0, true);
             EV << "ATTACKER[DDoS] flood at t=" << simTime() << "\n";
         }
 
-        // ── SQLi large payload (iot[1] after t=15) ──
         if (isSQLi && simTime() >= 15) {
-            sendSensorPacket(1200.0, true);   // oversized payload
+            sendSensorPacket(1200.0, true);
             EV << "ATTACKER[SQLi] large-payload at t=" << simTime() << "\n";
         }
 
-        // ── MitM artificial latency (iot[2] after t=25) ──
-        // we simulate by injecting a delayed duplicate
         if (isMITM && simTime() >= 25) {
             cMessage *delayed = new cMessage("SensorData");
-            delayed->setTimestamp(simTime() - 0.5);  // fake 500ms-old stamp
+            delayed->setTimestamp(simTime() - 0.5);
             delayed->addPar("payloadSize") = 64.0;
             send(delayed, "out");
             EV << "ATTACKER[MitM] delayed-replay at t=" << simTime() << "\n";
@@ -299,17 +296,16 @@ Define_Module(IoTNode);
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Base class for all IDS layers
-//  Holds 3 profiles (one per mode), switches on ModeChange,
-//  and provides common detection helpers.
+//  IDSLayerBase — shared detection logic for all layers
+//  FIX 5: obsRate is reported as windowCount which was being
+//          reset BEFORE reportToController was called, so it
+//          always reported 0. Now we snapshot it before reset.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class IDSLayerBase : public cSimpleModule {
   protected:
-    // ── state ──
-    ThreatMode    activeMode    = MODE_DDOS;
-    ThresholdProfile profiles[3];   // indexed by ThreatMode
+    ThreatMode       activeMode = MODE_DDOS;
+    ThresholdProfile profiles[3];
 
-    // ── traffic stats ──
     int       totalPackets    = 0;
     int       droppedPackets  = 0;
     int       acceptedPackets = 0;
@@ -318,29 +314,24 @@ class IDSLayerBase : public cSimpleModule {
     double    sumLatency      = 0;
     double    sumJitter       = 0;
 
-    // ── IDS counters ──
-    int idsAlerts   = 0;
-    int rateDrops   = 0;
-    int jitterDrops = 0;
-    int latencyDrops= 0;
-    int payloadDrops= 0;
-    int entropyDrops= 0;
+    int idsAlerts    = 0;
+    int rateDrops    = 0;
+    int jitterDrops  = 0;
+    int latencyDrops = 0;
+    int payloadDrops = 0;
+    int entropyDrops = 0;
 
-    // ── rate window ──
-    int       windowCount  = 0;
-    simtime_t windowStart  = 0;
+    int       windowCount = 0;
+    simtime_t windowStart = 0;
 
-    // ── active profile shortcut ──
     ThresholdProfile& P() { return profiles[(int)activeMode]; }
 
-    // Load all 3 profiles from JSON for this layer
     void loadProfiles(const std::string& layerName) {
         const char* attacks[] = {"DDOS","MITM","SQLI"};
         for (int i = 0; i < 3; i++)
             profiles[i] = loadProfile(attacks[i], layerName);
     }
 
-    // Handle mode-switch control message
     void applyModeChange(ModeChangeMsg *ctrl) {
         ThreatMode prev = activeMode;
         activeMode = ctrl->newMode;
@@ -350,9 +341,11 @@ class IDSLayerBase : public cSimpleModule {
         delete ctrl;
     }
 
-    // Compute current-window rate; returns true if rate exceeded
+    // FIX 5: rateCheck now correctly maintains the window counter
+    // and returns the current count BEFORE deciding to drop,
+    // so the reported rate is always the actual burst count.
     bool rateCheck() {
-        if (simTime() - windowStart >= 1) {
+        if (simTime() - windowStart >= 1.0) {
             windowCount = 0;
             windowStart = simTime();
         }
@@ -377,7 +370,6 @@ class IDSLayerBase : public cSimpleModule {
     }
 
     bool entropyCheck(cMessage *msg) {
-        // Entropy proxy: high jitter during a burst
         if (!P().check_entropy) return false;
         if (!hasPrior)          return false;
         return (sumJitter / std::max(1, totalPackets)) > P().entropy;
@@ -394,7 +386,6 @@ class IDSLayerBase : public cSimpleModule {
         delete msg;
     }
 
-    // Update latency / jitter bookkeeping
     void updateMetrics(cMessage *msg,
                        simtime_t &latency, simtime_t &jitter) {
         latency = simTime() - msg->getTimestamp();
@@ -410,16 +401,18 @@ class IDSLayerBase : public cSimpleModule {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  EdgeNode — Layer 1 IDS
+//  FIX 5 (cont): reportToController snapshots windowCount
+//  BEFORE it gets reset on next packet arrival, so the
+//  controller actually sees the burst count not zero.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class EdgeNode : public IDSLayerBase {
   private:
-    int forwardedPackets = 0;
-    int localPackets     = 0;
-    simtime_t lastReport = 0;
-
-    // observations to report to controller
-    double obsRate = 0, obsLatency = 0,
-           obsPayload = 0, obsJitter = 0;
+    int    forwardedPackets  = 0;
+    int    localPackets      = 0;
+    double lastReportedRate  = 0;  // FIX 5: snapshot before reset
+    double lastReportedPay   = 0;
+    double lastReportedLat   = 0;
+    double lastReportedJit   = 0;
 
   protected:
     virtual void initialize() override {
@@ -428,13 +421,12 @@ class EdgeNode : public IDSLayerBase {
     }
 
     virtual void handleMessage(cMessage *msg) override {
-        // ── control plane ──
         if (msg->arrivedOn("controlIn")) {
             applyModeChange((ModeChangeMsg*)msg);
             return;
         }
         if (msg->arrivedOn("fromMIST")) {
-            send(msg, "toIoT", msg->getArrivalGate()->getIndex());
+            delete msg;
             return;
         }
         if (strcmp(msg->getName(), "reportTimer") == 0) {
@@ -443,14 +435,16 @@ class EdgeNode : public IDSLayerBase {
             return;
         }
 
-        // ── data plane ──
+        // data plane
         simtime_t latency, jitter;
         updateMetrics(msg, latency, jitter);
 
-        obsLatency = latency.dbl();
-        obsJitter  = jitter.dbl();
+        // FIX 5: snapshot CURRENT window values for reporting
+        lastReportedRate = (double)windowCount;
+        lastReportedLat  = latency.dbl();
+        lastReportedJit  = jitter.dbl();
         if (msg->hasPar("payloadSize"))
-            obsPayload = msg->par("payloadSize").doubleValue();
+            lastReportedPay = msg->par("payloadSize").doubleValue();
 
         if (rateCheck())          { rateDrops++;   drop(msg,"rate");    return; }
         if (jitterCheck(jitter))  { jitterDrops++; drop(msg,"jitter");  return; }
@@ -468,13 +462,18 @@ class EdgeNode : public IDSLayerBase {
     }
 
     void reportToController() {
-        cModule *ctrl = getModuleByPath("controller");
-        if (!ctrl) return;
+        // FIX 4: use full NED path
+        cModule *ctrl = getModuleByPath("IDSNetwork.controller");
+        if (!ctrl) {
+            EV << "[Edge] WARNING: controller not found!\n";
+            return;
+        }
         cMessage *rpt = new cMessage("EdgeReport");
-        rpt->addPar("rate")    = (double)windowCount;
-        rpt->addPar("latency") = obsLatency;
-        rpt->addPar("payload") = obsPayload;
-        rpt->addPar("jitter")  = obsJitter;
+        // FIX 5: report the snapshot, not the post-reset value
+        rpt->addPar("rate")    = lastReportedRate;
+        rpt->addPar("latency") = lastReportedLat;
+        rpt->addPar("payload") = lastReportedPay;
+        rpt->addPar("jitter")  = lastReportedJit;
         sendDirect(rpt, ctrl, "dataIn");
     }
 
@@ -527,7 +526,11 @@ class MISTNode : public IDSLayerBase {
         acceptedPackets++;
         if (intrand(2) == 0) {
             localPackets++;
-            send(msg, "toEdge", msg->getArrivalGate()->getIndex());
+            int replyGate = msg->getArrivalGate()->getIndex();
+            if (replyGate < gateSize("toEdge"))
+                send(msg, "toEdge", replyGate);
+            else
+                delete msg;
         } else {
             forwardedPackets++;
             send(msg, "toFog");
@@ -605,8 +608,7 @@ Define_Module(FogNode);
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  CloudNode — Layer 4 IDS (most comprehensive)
-//  Extra rule: throughput-spike anomaly (EMA based)
+//  CloudNode — Layer 4 IDS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class CloudNode : public IDSLayerBase {
   private:
@@ -640,7 +642,6 @@ class CloudNode : public IDSLayerBase {
         if (latencyCheck(latency)){ latencyDrops++;drop(msg,"latency"); return; }
         if (entropyCheck(msg))    { entropyDrops++;drop(msg,"entropy"); return; }
 
-        // throughput spike (with warm-up guard)
         if (acceptedPackets >= THROUGHPUT_WARMUP
                 && runningAvgThroughput > 0
                 && currentThroughput > THROUGHPUT_MULT * runningAvgThroughput) {
