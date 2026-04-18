@@ -2,84 +2,60 @@
 #include <cmath>
 using namespace omnetpp;
 
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 //  Threat modes
-// ─────────────────────────────────────────────
-enum ThreatMode { MODE_DDOS = 0, MODE_MITM = 1, MODE_SQLI = 2 };
+// ─────────────────────────────────────────────────────────────
+enum ThreatMode { MODE_NORMAL = 0, MODE_DDOS = 1, MODE_SQLI = 2, MODE_MITM = 3 };
 
 const char* modeName(ThreatMode m) {
-    if (m == MODE_DDOS) return "DDOS";
-    if (m == MODE_MITM) return "MITM";
-    return "SQLI";
+    switch(m) {
+        case MODE_NORMAL: return "NORMAL";
+        case MODE_DDOS:   return "DDOS";
+        case MODE_SQLI:   return "SQLI";
+        case MODE_MITM:   return "MITM";
+    }
+    return "UNKNOWN";
 }
 
-// ─────────────────────────────────────────────
-//  ModeChange message
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+//  ModeChange message sent from controller to all layers
+// ─────────────────────────────────────────────────────────────
 class ModeChangeMsg : public cMessage {
   public:
     ThreatMode newMode;
     ModeChangeMsg(ThreatMode m) : cMessage("ModeChange"), newMode(m) {}
 };
 
-// ─────────────────────────────────────────────
-//  Hardcoded thresholds per mode per layer
-//  (no JSON loading — eliminates that failure point)
-// ─────────────────────────────────────────────
-struct LayerThresholds {
-    int    rate_pps;
-    double payload_bytes;
-    double latency_s;
-};
 
-// DDOS thresholds: tight rate, loose payload
-LayerThresholds DDOS_THRESH[4] = {
-    {3, 9999, 9999},  // edge:  drop if >3 pkts/s
-    {3, 9999, 9999},  // mist:  drop if >3 pkts/s
-    {2, 9999, 9999},  // fog:   drop if >2 pkts/s
-    {2, 9999, 9999},  // cloud: drop if >2 pkts/s
-};
-
-// SQLI thresholds: tight payload, loose rate
-LayerThresholds SQLI_THRESH[4] = {
-    {99, 300,  9999},  // edge:  drop if payload >300 bytes
-    {99, 300,  9999},  // mist:  drop if payload >300 bytes
-    {99, 300,  9999},  // fog:   drop if payload >300 bytes
-    {99, 300,  9999},  // cloud: drop if payload >300 bytes
-};
-
-// MITM thresholds: tight latency
-LayerThresholds MITM_THRESH[4] = {
-    {99, 9999, 0.15},  // edge:  drop if latency >0.15s
-    {99, 9999, 0.20},  // mist:  drop if latency >0.20s
-    {99, 9999, 0.25},  // fog:   drop if latency >0.25s
-    {99, 9999, 0.30},  // cloud: drop if latency >0.30s
-};
-
-
-// ═════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
 //  CentralController
-// ═════════════════════════════════════════════
+//  - Receives EdgeReports every second from all 3 edge nodes
+//  - Accumulates rate, payload, latency BEFORE deciding
+//  - Resets AFTER deciding (was the main bug before)
+//  - Broadcasts mode to all layers via getSystemModule()
+// ═════════════════════════════════════════════════════════════
 class CentralController : public cSimpleModule {
   private:
-    ThreatMode currentMode = MODE_DDOS;
+    ThreatMode currentMode = MODE_NORMAL;
     int switchCount = 0;
 
-    // Accumulated from EdgeReports each second
     double rateSum    = 0;
     double maxPayload = 0;
     double maxLatency = 0;
-    int    numReports = 0;
 
-    // Detection triggers
-    const double DDOS_RATE_TRIGGER    = 5.0;   // sum across all edges > 5
-    const double SQLI_PAYLOAD_TRIGGER = 300.0; // any edge sees payload > 300
-    const double MITM_LATENCY_TRIGGER = 0.10;  // any edge sees latency > 0.1s
+    // Thresholds — tuned to simulation parameters
+    // Normal: 5 IoT nodes × 1 pkt/s = 5 total/s across 3 edges
+    // DDoS: iot[0] sends +9 extra = 11 pkts/s from edge[0] alone
+    // SQLi: iot[1] sends 1200-byte packet at t>=15
+    // MitM: iot[2] sends packet with 500ms fake age at t>=25
+    const double DDOS_RATE_THRESH    = 8.0;   // sum across edges
+    const double SQLI_PAYLOAD_THRESH = 500.0; // bytes
+    const double MITM_LATENCY_THRESH = 0.40;  // seconds (normal=0.005s)
 
   protected:
     virtual void initialize() override {
-        EV << "[Controller] Started. Mode=DDOS (default)\n";
-        scheduleAt(simTime() + 1.5, new cMessage("scan"));
+        EV << "[Controller] Initialized. Mode=NORMAL\n";
+        scheduleAt(simTime() + 1, new cMessage("scan"));
     }
 
     virtual void handleMessage(cMessage *msg) override {
@@ -89,33 +65,36 @@ class CentralController : public cSimpleModule {
             double l    = msg->par("latency").doubleValue();
             if (p > maxPayload) maxPayload = p;
             if (l > maxLatency) maxLatency = l;
-            numReports++;
             delete msg;
             return;
         }
 
         if (strcmp(msg->getName(), "scan") == 0) {
-            // Decide mode BEFORE resetting
+            // Step 1: decide USING current accumulated values
             ThreatMode detected = decide();
 
-            EV << "[Controller] scan t=" << simTime()
+            EV << "[Controller] t=" << simTime()
                << " rateSum=" << rateSum
                << " maxPayload=" << maxPayload
                << " maxLatency=" << maxLatency
-               << " → " << modeName(detected) << "\n";
+               << " currentMode=" << modeName(currentMode)
+               << " detected=" << modeName(detected) << "\n";
 
+            // Step 2: switch and broadcast if changed
             if (detected != currentMode) {
-                EV << "★★★ [Controller] MODE SWITCH: "
+                EV << "★★★ [Controller] GLOBAL MODE SWITCH: "
                    << modeName(currentMode) << " → "
-                   << modeName(detected) << " at t=" << simTime() << "\n";
+                   << modeName(detected)
+                   << " at t=" << simTime() << " ★★★\n";
                 currentMode = detected;
                 switchCount++;
                 broadcast(detected);
                 recordScalar("mode switch at", simTime().dbl());
+                recordScalar("mode switched to", (int)detected);
             }
 
-            // Reset AFTER deciding
-            rateSum = 0; maxPayload = 0; maxLatency = 0; numReports = 0;
+            // Step 3: reset AFTER deciding
+            rateSum = 0; maxPayload = 0; maxLatency = 0;
             scheduleAt(simTime() + 1, msg);
             return;
         }
@@ -123,37 +102,46 @@ class CentralController : public cSimpleModule {
     }
 
     ThreatMode decide() {
-        // Priority: DDoS > SQLi > MitM
-        if (rateSum > DDOS_RATE_TRIGGER)        return MODE_DDOS;
-        if (maxPayload > SQLI_PAYLOAD_TRIGGER)   return MODE_SQLI;
-        if (maxLatency > MITM_LATENCY_TRIGGER)   return MODE_MITM;
-        return currentMode;
+        // DDoS: high packet rate (most dangerous, check first)
+        if (rateSum > DDOS_RATE_THRESH)          return MODE_DDOS;
+        // SQLi: oversized payload (specific signature)
+        if (maxPayload > SQLI_PAYLOAD_THRESH)     return MODE_SQLI;
+        // MitM: abnormal latency (delayed/replayed packets)
+        if (maxLatency > MITM_LATENCY_THRESH)     return MODE_MITM;
+        // No attack detected
+        return MODE_NORMAL;
     }
 
     void broadcast(ThreatMode m) {
-        // Use getSimulation()->getSystemModule() to get root
         cModule *net = getSimulation()->getSystemModule();
-        if (!net) { EV << "[Controller] ERROR: no system module\n"; return; }
-
-        // Build list of targets
-        const char* names[] = {"edge","edge","edge","mist","mist","fog","cloud",nullptr};
-        int indices[]        = {0,     1,     2,     0,     1,     -1,   -1,    -1};
-
-        for (int i = 0; names[i]; i++) {
-            cModule *mod = nullptr;
-            if (indices[i] >= 0)
-                mod = net->getSubmodule(names[i], indices[i]);
-            else
-                mod = net->getSubmodule(names[i]);
-
-            if (mod) {
-                sendDirect(new ModeChangeMsg(m), mod, "controlIn");
-                EV << "[Controller] → sent " << modeName(m)
-                   << " to " << names[i] << "\n";
-            } else {
-                EV << "[Controller] WARNING: " << names[i] << " not found\n";
-            }
+        if (!net) {
+            EV << "[Controller] ERROR: cannot get system module\n";
+            return;
         }
+
+        // Edge nodes
+        for (int i = 0; i < 3; i++) {
+            cModule *mod = net->getSubmodule("edge", i);
+            if (mod) sendDirect(new ModeChangeMsg(m), mod, "controlIn");
+            else EV << "[Controller] WARNING: edge[" << i << "] not found\n";
+        }
+        // MIST nodes
+        for (int i = 0; i < 2; i++) {
+            cModule *mod = net->getSubmodule("mist", i);
+            if (mod) sendDirect(new ModeChangeMsg(m), mod, "controlIn");
+            else EV << "[Controller] WARNING: mist[" << i << "] not found\n";
+        }
+        // Fog
+        cModule *fog = net->getSubmodule("fog");
+        if (fog) sendDirect(new ModeChangeMsg(m), fog, "controlIn");
+        else EV << "[Controller] WARNING: fog not found\n";
+        // Cloud
+        cModule *cloud = net->getSubmodule("cloud");
+        if (cloud) sendDirect(new ModeChangeMsg(m), cloud, "controlIn");
+        else EV << "[Controller] WARNING: cloud not found\n";
+
+        EV << "[Controller] Broadcast mode=" << modeName(m)
+           << " to all layers\n";
     }
 
     virtual void finish() override {
@@ -164,12 +152,12 @@ class CentralController : public cSimpleModule {
 Define_Module(CentralController);
 
 
-// ═════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
 //  IoTNode
-//  iot[0] → DDoS flood (t≥5)
-//  iot[1] → SQLi large payload (t≥15)
-//  iot[2] → MitM delayed packet (t≥25)
-// ═════════════════════════════════════════════
+//  iot[0] → DDoS flood (t>=5)
+//  iot[1] → SQLi large payload (t>=15)
+//  iot[2] → MitM delayed replay (t>=25)
+// ═════════════════════════════════════════════════════════════
 class IoTNode : public cSimpleModule {
   private:
     int packetCount = 0;
@@ -180,6 +168,7 @@ class IoTNode : public cSimpleModule {
     }
 
     virtual void handleMessage(cMessage *msg) override {
+        // reply coming back
         if (strcmp(msg->getName(), "SensorData") == 0) {
             EV << "IoT[" << getIndex() << "] RTT="
                << (simTime() - msg->getTimestamp()) << "\n";
@@ -187,63 +176,133 @@ class IoTNode : public cSimpleModule {
             return;
         }
 
+        // normal packet every second
+//        packetCount++;
+//        sendPkt(64.0);
+//        scheduleAt(simTime() + 1, msg);
+//
+//        // iot[0]: DDoS — flood with 9 extra packets
+//        if (getIndex() == 0 && simTime() >= 5) {
+//            for (int i = 0; i < 9; i++) sendPkt(64.0);
+//            EV << "ATTACKER[DDoS] flood #" << packetCount
+//               << " at t=" << simTime() << "\n";
+//        }
+//
+//        // iot[1]: SQLi — send oversized payload packet
+//        if (getIndex() == 1 && simTime() >= 15) {
+//            sendPkt(1200.0);
+//            EV << "ATTACKER[SQLi] large-payload at t=" << simTime() << "\n";
+//        }
+//
+//        // iot[2]: MitM — inject packet with fake old timestamp
+//        if (getIndex() == 2 && simTime() >= 25) {
+//            cMessage *fake = new cMessage("SensorData");
+//            fake->setTimestamp(simTime() - 0.5); // 500ms-old stamp
+//            fake->addPar("payloadSize") = 64.0;
+//            send(fake, "out");
+//            EV << "ATTACKER[MitM] replay at t=" << simTime() << "\n";
+//        }
         packetCount++;
-        sendPkt(64.0);  // normal packet
+        sendPkt(64.0);
         scheduleAt(simTime() + 1, msg);
 
-        // iot[0] DDoS
-        if (getIndex() == 0 && simTime() >= 5) {
+        // DDoS only between 5–15
+        if (getIndex() == 0 && simTime() >= 5 && simTime() < 15) {
             for (int i = 0; i < 9; i++) sendPkt(64.0);
-            EV << "ATTACKER[DDoS] flood at t=" << simTime() << "\n";
+            EV << "ATTACKER[DDoS] at t=" << simTime() << "\n";
         }
 
-        // iot[1] SQLi
-        if (getIndex() == 1 && simTime() >= 15) {
+        // SQLi only between 15–25
+        if (getIndex() == 1 && simTime() >= 15 && simTime() < 25) {
             sendPkt(1200.0);
-            EV << "ATTACKER[SQLi] large-payload at t=" << simTime() << "\n";
+            EV << "ATTACKER[SQLi] at t=" << simTime() << "\n";
         }
 
-        // iot[2] MitM
+        // MitM only after 25
         if (getIndex() == 2 && simTime() >= 25) {
-            cMessage *delayed = new cMessage("SensorData");
-            delayed->setTimestamp(simTime() - 0.5); // fake old timestamp
-            delayed->addPar("payloadSize") = 64.0;
-            send(delayed, "out");
-            EV << "ATTACKER[MitM] delayed-replay at t=" << simTime() << "\n";
+            cMessage *fake = new cMessage("SensorData");
+            fake->setTimestamp(simTime() - 0.5);
+            fake->addPar("payloadSize") = 64.0;
+            send(fake, "out");
+            EV << "ATTACKER[MitM] at t=" << simTime() << "\n";
         }
     }
 
-    void sendPkt(double payload) {
+    void sendPkt(double payloadBytes) {
         cMessage *pkt = new cMessage("SensorData");
         pkt->setTimestamp(simTime());
-        pkt->addPar("payloadSize") = payload;
+        pkt->addPar("payloadSize") = payloadBytes;
         send(pkt, "out");
     }
 };
 Define_Module(IoTNode);
 
 
-// ═════════════════════════════════════════════
-//  IDSBase — shared logic
-// ═════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
+//  IDSBase — shared IDS logic for all layers
+//
+//  KEY DESIGN:
+//  Each layer checks ALL THREE attack signatures on EVERY packet
+//  regardless of current mode. Mode only changes THRESHOLDS,
+//  not which checks run. This ensures SQLi and MitM are never
+//  missed because DDoS is happening simultaneously.
+// ═════════════════════════════════════════════════════════════
 class IDSBase : public cSimpleModule {
   protected:
-    ThreatMode mode     = MODE_DDOS;
-    int layerIdx        = 0; // 0=edge,1=mist,2=fog,3=cloud
+    ThreatMode mode = MODE_NORMAL;
 
+    // Stats
     int totalPkts    = 0;
     int droppedPkts  = 0;
     int acceptedPkts = 0;
-    int idsAlerts    = 0;
+    int ddosDrops    = 0;
+    int sqliDrops    = 0;
+    int mitmDrops    = 0;
 
     simtime_t lastLatency = 0;
     bool      hasPrior    = false;
     double    sumLatency  = 0;
     double    sumJitter   = 0;
 
-    // rate window
+    // Rate window
     int       wCount = 0;
-    simtime_t wStart  = 0;
+    simtime_t wStart = 0;
+
+    // Per-mode thresholds — tighter when attack detected
+    // NORMAL: generous thresholds (allow normal traffic)
+    // DDOS:   very tight rate
+    // SQLI:   very tight payload
+    // MITM:   very tight latency
+
+    // Rate thresholds per mode (pkts/s per node)
+    int rateThresh() {
+        switch(mode) {
+            case MODE_DDOS:   return 2;  // very tight during DDoS
+            case MODE_SQLI:   return 6;  // loose during SQLi
+            case MODE_MITM:   return 6;  // loose during MitM
+            default:          return 5;  // normal baseline
+        }
+    }
+
+    // Payload thresholds per mode (bytes)
+    double payloadThresh() {
+        switch(mode) {
+            case MODE_SQLI:   return 200.0; // very tight during SQLi
+            case MODE_DDOS:   return 9999;  // not checking payload in DDoS
+            case MODE_MITM:   return 9999;  // not checking payload in MitM
+            default:          return 500.0; // normal baseline
+        }
+    }
+
+    // Latency thresholds per mode (seconds)
+    double latencyThresh() {
+        switch(mode) {
+            case MODE_MITM:   return 0.10; // very tight during MitM
+            case MODE_DDOS:   return 9999; // not checking latency in DDoS
+            case MODE_SQLI:   return 9999; // not checking latency in SQLi
+            default:          return 0.50; // normal baseline
+        }
+    }
 
     void applyMode(ModeChangeMsg *m) {
         ThreatMode prev = mode;
@@ -254,59 +313,62 @@ class IDSBase : public cSimpleModule {
                << modeName(mode) << " at t=" << simTime() << "\n";
     }
 
-    // Returns true and drops if packet should be dropped
-    bool checkAndDrop(cMessage *msg) {
-        // Get active thresholds
-        LayerThresholds *T;
-        if      (mode == MODE_DDOS) T = &DDOS_THRESH[layerIdx];
-        else if (mode == MODE_SQLI) T = &SQLI_THRESH[layerIdx];
-        else                        T = &MITM_THRESH[layerIdx];
-
+    // Returns true if packet was malicious and dropped
+    bool inspect(cMessage *msg) {
         // Compute metrics
         simtime_t latency = simTime() - msg->getTimestamp();
-        simtime_t jitter  = hasPrior ? fabs((latency - lastLatency).dbl()) : 0;
+        simtime_t jitter  = hasPrior
+                            ? fabs((latency - lastLatency).dbl()) : 0;
         lastLatency = latency;
         hasPrior    = true;
         sumLatency += latency.dbl();
         sumJitter  += jitter.dbl();
         totalPkts++;
 
+        double payload = msg->hasPar("payloadSize")
+                         ? msg->par("payloadSize").doubleValue() : 64.0;
+
         // Rate window
         if (simTime() - wStart >= 1.0) { wCount = 0; wStart = simTime(); }
         wCount++;
 
-        double payload = msg->hasPar("payloadSize") ?
-                         msg->par("payloadSize").doubleValue() : 64.0;
-
-        // Rate check
-        if (wCount > T->rate_pps) {
+        // ── Check 1: Rate (DDoS signature) ──
+        if (wCount > rateThresh()) {
             EV << "[" << getName() << "-IDS][" << modeName(mode)
-               << "] DROP rate=" << wCount << ">" << T->rate_pps
+               << "] DROP DDoS rate=" << wCount
+               << " thresh=" << rateThresh()
                << " t=" << simTime() << "\n";
-            idsAlerts++; droppedPkts++;
-            recordScalar((std::string(getName())+" drop").c_str(), simTime().dbl());
+            ddosDrops++; droppedPkts++;
+            recordScalar((std::string(getName())+" DDOS drop").c_str(),
+                         simTime().dbl());
             delete msg;
             return true;
         }
 
-        // Payload check
-        if (payload > T->payload_bytes) {
+        // ── Check 2: Payload (SQLi signature) ──
+        // Always run this check regardless of mode
+        if (payload > payloadThresh()) {
             EV << "[" << getName() << "-IDS][" << modeName(mode)
-               << "] DROP payload=" << payload << ">" << T->payload_bytes
+               << "] DROP SQLi payload=" << payload
+               << " thresh=" << payloadThresh()
                << " t=" << simTime() << "\n";
-            idsAlerts++; droppedPkts++;
-            recordScalar((std::string(getName())+" drop").c_str(), simTime().dbl());
+            sqliDrops++; droppedPkts++;
+            recordScalar((std::string(getName())+" SQLI drop").c_str(),
+                         simTime().dbl());
             delete msg;
             return true;
         }
 
-        // Latency check
-        if (latency.dbl() > T->latency_s) {
+        // ── Check 3: Latency (MitM signature) ──
+        // Always run this check regardless of mode
+        if (latency.dbl() > latencyThresh()) {
             EV << "[" << getName() << "-IDS][" << modeName(mode)
-               << "] DROP latency=" << latency << ">" << T->latency_s
+               << "] DROP MitM latency=" << latency
+               << " thresh=" << latencyThresh()
                << " t=" << simTime() << "\n";
-            idsAlerts++; droppedPkts++;
-            recordScalar((std::string(getName())+" drop").c_str(), simTime().dbl());
+            mitmDrops++; droppedPkts++;
+            recordScalar((std::string(getName())+" MITM drop").c_str(),
+                         simTime().dbl());
             delete msg;
             return true;
         }
@@ -315,41 +377,46 @@ class IDSBase : public cSimpleModule {
         return false;
     }
 
-    void writeFinish(const char* prefix) {
+    void writeStats(const char* prefix) {
         double simT = simTime().dbl();
         std::string p(prefix);
         recordScalar((p+" total packets").c_str(),    totalPkts);
         recordScalar((p+" dropped packets").c_str(),  droppedPkts);
         recordScalar((p+" accepted packets").c_str(), acceptedPkts);
-        recordScalar((p+" IDS alerts").c_str(),       idsAlerts);
+        recordScalar((p+" DDoS drops").c_str(),       ddosDrops);
+        recordScalar((p+" SQLi drops").c_str(),       sqliDrops);
+        recordScalar((p+" MitM drops").c_str(),       mitmDrops);
         recordScalar((p+" drop rate").c_str(),
-            totalPkts>0 ? (double)droppedPkts/totalPkts : 0);
+            totalPkts > 0 ? (double)droppedPkts / totalPkts : 0);
         recordScalar((p+" detection rate").c_str(),
-            totalPkts>0 ? (double)idsAlerts/totalPkts : 0);
+            totalPkts > 0 ? (double)droppedPkts / totalPkts : 0);
         recordScalar((p+" avg latency").c_str(),
-            totalPkts>0 ? sumLatency/totalPkts : 0);
-        recordScalar((p+" throughput").c_str(),
-            simT>0 ? totalPkts/simT : 0);
+            totalPkts > 0 ? sumLatency / totalPkts : 0);
+        recordScalar((p+" avg jitter").c_str(),
+            totalPkts > 0 ? sumJitter / totalPkts : 0);
+        recordScalar((p+" throughput pps").c_str(),
+            simT > 0 ? totalPkts / simT : 0);
+        recordScalar((p+" accepted throughput pps").c_str(),
+            simT > 0 ? acceptedPkts / simT : 0);
     }
 };
 
 
-// ═════════════════════════════════════════════
-//  EdgeNode
-// ═════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
+//  EdgeNode — Layer 1 IDS
+// ═════════════════════════════════════════════════════════════
 class EdgeNode : public IDSBase {
   private:
     int fwdPkts   = 0;
     int localPkts = 0;
 
-    // snapshot for reporting
+    // Snapshot for EdgeReport (captured at packet arrival)
     double snapRate    = 0;
     double snapPayload = 0;
     double snapLatency = 0;
 
   protected:
     virtual void initialize() override {
-        layerIdx = 0;
         scheduleAt(simTime() + 1, new cMessage("report"));
     }
 
@@ -368,13 +435,17 @@ class EdgeNode : public IDSBase {
             return;
         }
 
-        // Snapshot BEFORE checkAndDrop (which may delete msg)
-        snapRate    = (double)(wCount + 1); // +1 because wCount not yet incremented
-        if (msg->hasPar("payloadSize"))
-            snapPayload = msg->par("payloadSize").doubleValue();
-        snapLatency = (simTime() - msg->getTimestamp()).dbl();
+        // Snapshot values BEFORE inspect() (which increments wCount)
+        double payload = msg->hasPar("payloadSize")
+                         ? msg->par("payloadSize").doubleValue() : 64.0;
+        double lat = (simTime() - msg->getTimestamp()).dbl();
 
-        if (checkAndDrop(msg)) return;
+        // Update snapshot (keep max seen this window)
+        if (payload > snapPayload) snapPayload = payload;
+        if (lat > snapLatency)     snapLatency = lat;
+        snapRate = (double)(wCount + 1); // approximate, inspect will update wCount
+
+        if (inspect(msg)) return;
 
         if (intrand(2) == 0) {
             localPkts++;
@@ -388,18 +459,23 @@ class EdgeNode : public IDSBase {
     void sendReport() {
         cModule *net  = getSimulation()->getSystemModule();
         cModule *ctrl = net ? net->getSubmodule("controller") : nullptr;
-        if (!ctrl) return;
-
+        if (!ctrl) {
+            EV << "[Edge] WARNING: controller not found\n";
+            return;
+        }
         cMessage *rpt = new cMessage("EdgeReport");
         rpt->addPar("rate")    = snapRate;
         rpt->addPar("payload") = snapPayload;
         rpt->addPar("latency") = snapLatency;
         rpt->addPar("jitter")  = 0.0;
         sendDirect(rpt, ctrl, "dataIn");
+
+        // Reset snapshots after reporting
+        snapRate = 0; snapPayload = 0; snapLatency = 0;
     }
 
     virtual void finish() override {
-        writeFinish("Edge");
+        writeStats("Edge");
         recordScalar("Edge forwarded", fwdPkts);
         recordScalar("Edge local",     localPkts);
     }
@@ -407,16 +483,16 @@ class EdgeNode : public IDSBase {
 Define_Module(EdgeNode);
 
 
-// ═════════════════════════════════════════════
-//  MISTNode
-// ═════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
+//  MISTNode — Layer 2 IDS
+// ═════════════════════════════════════════════════════════════
 class MISTNode : public IDSBase {
   private:
     int fwdPkts   = 0;
     int localPkts = 0;
 
   protected:
-    virtual void initialize() override { layerIdx = 1; }
+    virtual void initialize() override {}
 
     virtual void handleMessage(cMessage *msg) override {
         if (msg->arrivedOn("controlIn")) {
@@ -424,7 +500,7 @@ class MISTNode : public IDSBase {
             return;
         }
 
-        if (checkAndDrop(msg)) return;
+        if (inspect(msg)) return;
 
         if (intrand(2) == 0) {
             localPkts++;
@@ -438,7 +514,7 @@ class MISTNode : public IDSBase {
     }
 
     virtual void finish() override {
-        writeFinish("MIST");
+        writeStats("MIST");
         recordScalar("MIST forwarded", fwdPkts);
         recordScalar("MIST local",     localPkts);
     }
@@ -446,15 +522,15 @@ class MISTNode : public IDSBase {
 Define_Module(MISTNode);
 
 
-// ═════════════════════════════════════════════
-//  FogNode
-// ═════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
+//  FogNode — Layer 3 IDS
+// ═════════════════════════════════════════════════════════════
 class FogNode : public IDSBase {
   private:
     int fwdPkts = 0;
 
   protected:
-    virtual void initialize() override { layerIdx = 2; }
+    virtual void initialize() override {}
 
     virtual void handleMessage(cMessage *msg) override {
         if (msg->arrivedOn("controlIn")) {
@@ -462,32 +538,32 @@ class FogNode : public IDSBase {
             return;
         }
 
-        if (checkAndDrop(msg)) return;
+        if (inspect(msg)) return;
 
         fwdPkts++;
         send(msg, "toCloud");
     }
 
     virtual void finish() override {
-        writeFinish("Fog");
+        writeStats("Fog");
         recordScalar("Fog forwarded", fwdPkts);
     }
 };
 Define_Module(FogNode);
 
 
-// ═════════════════════════════════════════════
-//  CloudNode
-// ═════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
+//  CloudNode — Layer 4 IDS + throughput anomaly detection
+// ═════════════════════════════════════════════════════════════
 class CloudNode : public IDSBase {
   private:
-    double runAvg           = 0;
-    int    throughputDrops  = 0;
-    const double T_MULT     = 1.5;
-    const int    T_WARMUP   = 5;
+    double runAvg          = 0;
+    int    throughputDrops = 0;
+    const double T_MULT    = 1.5;
+    const int    T_WARMUP  = 5;
 
   protected:
-    virtual void initialize() override { layerIdx = 3; }
+    virtual void initialize() override {}
 
     virtual void handleMessage(cMessage *msg) override {
         if (msg->arrivedOn("controlIn")) {
@@ -495,28 +571,32 @@ class CloudNode : public IDSBase {
             return;
         }
 
-        if (checkAndDrop(msg)) return;
+        if (inspect(msg)) return;
 
-        double cur = totalPkts / simTime().dbl();
+        // Throughput spike detection (extra Cloud-level rule)
+        double cur = (simTime().dbl() > 0)
+                     ? totalPkts / simTime().dbl() : 0;
         runAvg = (runAvg == 0) ? cur : 0.8*runAvg + 0.2*cur;
 
         if (acceptedPkts >= T_WARMUP && runAvg > 0
                 && cur > T_MULT * runAvg) {
-            throughputDrops++; idsAlerts++; droppedPkts++;
-            acceptedPkts--;  // undo the increment from checkAndDrop
             EV << "[Cloud-IDS][" << modeName(mode)
-               << "] DROP throughput spike t=" << simTime() << "\n";
+               << "] DROP throughput spike cur=" << cur
+               << " avg=" << runAvg
+               << " t=" << simTime() << "\n";
+            throughputDrops++; droppedPkts++;
+            acceptedPkts--;
             delete msg;
             return;
         }
 
-        EV << "[Cloud] ACCEPTED latency="
-           << (simTime() - SIMTIME_ZERO) << " t=" << simTime() << "\n";
+        EV << "[Cloud] ACCEPTED t=" << simTime()
+           << " mode=" << modeName(mode) << "\n";
         delete msg;
     }
 
     virtual void finish() override {
-        writeFinish("Cloud");
+        writeStats("Cloud");
         recordScalar("Cloud throughput drops", throughputDrops);
     }
 };
