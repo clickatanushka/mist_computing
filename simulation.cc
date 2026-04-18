@@ -43,11 +43,7 @@ class CentralController : public cSimpleModule {
     double maxPayload = 0;
     double maxLatency = 0;
 
-    // Thresholds — tuned to simulation parameters
-    // Normal: 5 IoT nodes × 1 pkt/s = 5 total/s across 3 edges
-    // DDoS: iot[0] sends +9 extra = 11 pkts/s from edge[0] alone
-    // SQLi: iot[1] sends 1200-byte packet at t>=15
-    // MitM: iot[2] sends packet with 500ms fake age at t>=25
+
     const double DDOS_RATE_THRESH    = 8.0;   // sum across edges
     const double SQLI_PAYLOAD_THRESH = 500.0; // bytes
     const double MITM_LATENCY_THRESH = 0.40;  // seconds (normal=0.005s)
@@ -176,49 +172,29 @@ class IoTNode : public cSimpleModule {
             return;
         }
 
-        // normal packet every second
-//        packetCount++;
-//        sendPkt(64.0);
-//        scheduleAt(simTime() + 1, msg);
-//
-//        // iot[0]: DDoS — flood with 9 extra packets
-//        if (getIndex() == 0 && simTime() >= 5) {
-//            for (int i = 0; i < 9; i++) sendPkt(64.0);
-//            EV << "ATTACKER[DDoS] flood #" << packetCount
-//               << " at t=" << simTime() << "\n";
-//        }
-//
-//        // iot[1]: SQLi — send oversized payload packet
-//        if (getIndex() == 1 && simTime() >= 15) {
-//            sendPkt(1200.0);
-//            EV << "ATTACKER[SQLi] large-payload at t=" << simTime() << "\n";
-//        }
-//
-//        // iot[2]: MitM — inject packet with fake old timestamp
-//        if (getIndex() == 2 && simTime() >= 25) {
-//            cMessage *fake = new cMessage("SensorData");
-//            fake->setTimestamp(simTime() - 0.5); // 500ms-old stamp
-//            fake->addPar("payloadSize") = 64.0;
-//            send(fake, "out");
-//            EV << "ATTACKER[MitM] replay at t=" << simTime() << "\n";
+
 //        }
         packetCount++;
         sendPkt(64.0);
         scheduleAt(simTime() + 1, msg);
 
-        // DDoS only between 5–15
+        // -------------------------------
+        // EXCLUSIVE ATTACK WINDOWS
+        // -------------------------------
+
+        // iot[0]: DDoS ONLY between 5–15
         if (getIndex() == 0 && simTime() >= 5 && simTime() < 15) {
             for (int i = 0; i < 9; i++) sendPkt(64.0);
             EV << "ATTACKER[DDoS] at t=" << simTime() << "\n";
         }
 
-        // SQLi only between 15–25
+        // iot[1]: SQLi ONLY between 15–25
         if (getIndex() == 1 && simTime() >= 15 && simTime() < 25) {
             sendPkt(1200.0);
             EV << "ATTACKER[SQLi] at t=" << simTime() << "\n";
         }
 
-        // MitM only after 25
+        // iot[2]: MitM ONLY after 25
         if (getIndex() == 2 && simTime() >= 25) {
             cMessage *fake = new cMessage("SensorData");
             fake->setTimestamp(simTime() - 0.5);
@@ -268,11 +244,7 @@ class IDSBase : public cSimpleModule {
     int       wCount = 0;
     simtime_t wStart = 0;
 
-    // Per-mode thresholds — tighter when attack detected
-    // NORMAL: generous thresholds (allow normal traffic)
-    // DDOS:   very tight rate
-    // SQLI:   very tight payload
-    // MITM:   very tight latency
+
 
     // Rate thresholds per mode (pkts/s per node)
     int rateThresh() {
